@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euxo pipefail
+
+export DEBIAN_FRONTEND=noninteractive
+
+apt-get update
+apt-get install -y ca-certificates curl gnupg nginx openssl ruby-full wget
+
+curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
+apt-get install -y nodejs
+npm install -g yarn pm2
+
+systemctl enable nginx
+systemctl start nginx
+
+env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
+systemctl enable pm2-ubuntu || true
+
+mkdir -p ${deployment_path}
+chown -R ubuntu:ubuntu ${deployment_path}
+
+cd /tmp
+if ! systemctl is-enabled codedeploy-agent >/dev/null 2>&1; then
+    wget https://aws-codedeploy-${aws_region}.s3.${aws_region}.amazonaws.com/latest/install
+    chmod +x ./install
+    ./install auto
+fi
+
+systemctl enable codedeploy-agent
+systemctl restart codedeploy-agent
+
+mkdir -p "$(dirname "${tls_certificate_path}")"
+mkdir -p "$(dirname "${tls_private_key_path}")"
+
+if [ ! -f "${tls_certificate_path}" ] || [ ! -f "${tls_private_key_path}" ]; then
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        -keyout "${tls_private_key_path}" \
+        -out "${tls_certificate_path}" \
+        -subj "/CN=${domain_name}"
+fi
+
+echo "${nginx_conf_base64}" | base64 --decode > /etc/nginx/sites-available/${service_name}.conf
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/${service_name}.conf /etc/nginx/sites-enabled/${service_name}.conf
+
+nginx -t
+systemctl restart nginx

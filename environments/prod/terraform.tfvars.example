@@ -1,0 +1,8 @@
+aws_region         = "us-east-1"
+hermes_domain_name = "api.hermes.example.com"
+hermes_codedeploy_artifact_bucket = "rp-hermes-codedeploy-artifacts"
+# rp_api_domain_name = "api.reflectionsprojections.org"
+
+# Optional if you want SSH in addition to SSM Session Manager.
+# key_name = "your-ec2-keypair"
+# ssh_cidr_blocks = ["YOUR.IP.ADDRESS.HERE/32"]
