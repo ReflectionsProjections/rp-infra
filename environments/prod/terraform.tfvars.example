@@ -1,6 +1,7 @@
 aws_region         = "us-east-1"
 hermes_domain_name = "api.hermes.example.com"
 hermes_codedeploy_artifact_bucket = "rp-hermes-codedeploy-artifacts"
+hermes_letsencrypt_email = "infra@example.com"
 # rp_api_domain_name = "api.reflectionsprojections.org"
 
 # Optional if you want SSH in addition to SSM Session Manager.

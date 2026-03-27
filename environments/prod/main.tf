@@ -34,6 +34,8 @@ module "hermes_api" {
   instance_type               = "t2.small"
   key_name                    = var.key_name
   ssh_cidr_blocks             = var.ssh_cidr_blocks
+  use_letsencrypt             = true
+  letsencrypt_email           = var.hermes_letsencrypt_email
   codedeploy_service_role_arn = aws_iam_role.codedeploy_service.arn
   extra_tags                  = local.common_tags
 }

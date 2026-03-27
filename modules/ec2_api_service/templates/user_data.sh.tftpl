@@ -10,6 +10,10 @@ curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 apt-get install -y nodejs
 npm install -g yarn pm2
 
+if [ "${use_letsencrypt}" = "true" ]; then
+    apt-get install -y certbot python3-certbot-nginx
+fi
+
 systemctl enable nginx
 systemctl start nginx
 
@@ -45,3 +49,53 @@ ln -sf /etc/nginx/sites-available/${service_name}.conf /etc/nginx/sites-enabled/
 
 nginx -t
 systemctl restart nginx
+
+if [ "${use_letsencrypt}" = "true" ]; then
+    cat > /usr/local/bin/${service_name}-sync-letsencrypt-cert.sh <<EOF
+#!/bin/bash
+set -euo pipefail
+
+LE_LIVE_DIR="/etc/letsencrypt/live/${domain_name}"
+
+if [ ! -f "\${LE_LIVE_DIR}/fullchain.pem" ] || [ ! -f "\${LE_LIVE_DIR}/privkey.pem" ]; then
+    exit 0
+fi
+
+install -D -m 0644 "\${LE_LIVE_DIR}/fullchain.pem" "${tls_certificate_path}"
+install -D -m 0600 "\${LE_LIVE_DIR}/privkey.pem" "${tls_private_key_path}"
+
+nginx -t
+systemctl reload nginx
+EOF
+    chmod +x /usr/local/bin/${service_name}-sync-letsencrypt-cert.sh
+
+    cat > /usr/local/bin/${service_name}-issue-letsencrypt-cert.sh <<EOF
+#!/bin/bash
+set -euo pipefail
+
+certbot certonly \
+    --nginx \
+    --non-interactive \
+    --agree-tos \
+    --email "${letsencrypt_email}" \
+    --keep-until-expiring \
+    -d "${domain_name}"
+
+/usr/local/bin/${service_name}-sync-letsencrypt-cert.sh
+EOF
+    chmod +x /usr/local/bin/${service_name}-issue-letsencrypt-cert.sh
+
+    mkdir -p /etc/letsencrypt/renewal-hooks/deploy
+    cat > /etc/letsencrypt/renewal-hooks/deploy/${service_name}-sync.sh <<EOF
+#!/bin/bash
+set -euo pipefail
+/usr/local/bin/${service_name}-sync-letsencrypt-cert.sh
+EOF
+    chmod +x /etc/letsencrypt/renewal-hooks/deploy/${service_name}-sync.sh
+
+    /usr/local/bin/${service_name}-sync-letsencrypt-cert.sh
+
+    if [ -n "${letsencrypt_email}" ]; then
+        /usr/local/bin/${service_name}-issue-letsencrypt-cert.sh || true
+    fi
+fi

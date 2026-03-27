@@ -143,6 +143,8 @@ resource "aws_instance" "this" {
     aws_region            = var.aws_region
     deployment_path       = var.deployment_path
     domain_name           = var.domain_name
+    letsencrypt_email     = var.letsencrypt_email
+    use_letsencrypt       = var.use_letsencrypt
     nginx_conf_base64     = base64encode(local.nginx_conf)
     service_name          = var.service_name
     tls_certificate_path  = local.cert_path

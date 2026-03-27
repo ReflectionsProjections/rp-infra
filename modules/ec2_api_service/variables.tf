@@ -70,6 +70,18 @@ variable "tls_private_key_path" {
   default     = ""
 }
 
+variable "use_letsencrypt" {
+  description = "Whether to install Certbot and attempt to issue a Let's Encrypt certificate for the service domain."
+  type        = bool
+  default     = false
+}
+
+variable "letsencrypt_email" {
+  description = "Email address used for Let's Encrypt registration. Required when use_letsencrypt is true."
+  type        = string
+  default     = ""
+}
+
 variable "extra_tags" {
   description = "Additional tags applied to resources for this service."
   type        = map(string)

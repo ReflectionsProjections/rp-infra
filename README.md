@@ -47,9 +47,31 @@ terraform apply
 ## Notes
 
 - Cloudflare DNS is not yet managed in this scaffold. Terraform outputs the Elastic IPs you can point A records at.
-- Nginx is configured to use per-service cert paths. The bootstrap script creates a temporary self-signed cert so Nginx can start cleanly before you replace it with the real origin cert.
+- Nginx is configured to use stable per-service cert paths. The bootstrap script creates a temporary self-signed cert so Nginx can start cleanly before Certbot issues a real certificate.
 - Hermes now ships its own `appspec.yml` and CodeDeploy scripts, matching the `rp-api` deployment model.
 - Hermes deployment automation should live here, not in the Hermes repo itself. This repo can safely hold AWS-specific GitHub Actions secrets/vars because it is the infrastructure owner.
+- Hermes is configured to install Certbot on the host. If `hermes_letsencrypt_email` is set, first boot will try to obtain a Let's Encrypt certificate and future renewals will be synced back into the Nginx cert paths automatically.
+
+## Hermes TLS
+
+Hermes now uses host-managed Let's Encrypt certificates rather than long-lived self-signed certs or a cert copied in from Terraform.
+
+- Set `hermes_letsencrypt_email` in `terraform.tfvars`
+- Keep the DNS record for `hermes_domain_name` pointed at the instance
+- The instance bootstrap will:
+  - start Nginx with a temporary self-signed certificate
+  - install Certbot
+  - attempt `certbot certonly --nginx`
+  - copy the issued certificate into the stable Nginx paths Terraform manages
+  - install a Certbot renewal hook so renewals keep those paths fresh
+
+If first-boot issuance happens before DNS is ready, you can rerun it on the box with:
+
+```bash
+sudo /usr/local/bin/hermes-api-issue-letsencrypt-cert.sh
+```
+
+After the origin has a real certificate, Cloudflare should be set to `Proxied` with SSL/TLS mode `Full (strict)`.
 
 ## Hermes CI/CD
 

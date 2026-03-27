@@ -40,6 +40,12 @@ variable "hermes_codedeploy_artifact_bucket" {
   default     = "rp-hermes-codedeploy-artifacts"
 }
 
+variable "hermes_letsencrypt_email" {
+  description = "Email address used to register and renew the Hermes API Let's Encrypt certificate."
+  type        = string
+  default     = ""
+}
+
 # variable "rp_api_domain_name" {
 #   description = "Public domain name for the RP API."
 #   type        = string
