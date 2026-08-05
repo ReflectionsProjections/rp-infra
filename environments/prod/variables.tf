@@ -46,7 +46,25 @@ variable "hermes_letsencrypt_email" {
   default     = ""
 }
 
-# variable "rp_api_domain_name" {
-#   description = "Public domain name for the RP API."
-#   type        = string
-# }
+variable "rp_api_domain_name" {
+  description = "Public domain name for the RP API staging host."
+  type        = string
+}
+
+variable "rp_api_codedeploy_artifact_bucket" {
+  description = "Existing S3 bucket used to store RP API CodeDeploy revision bundles."
+  type        = string
+  default     = "rp-api-codedeploy-artifacts"
+}
+
+variable "rp_api_letsencrypt_email" {
+  description = "Email address used to register and renew the RP API staging Let's Encrypt certificate."
+  type        = string
+  default     = ""
+}
+
+variable "rp_api_supabase_backup_bucket" {
+  description = "S3 bucket created for the Supabase backup script uploads. The instance role gets s3:PutObject on it."
+  type        = string
+  default     = "rp-api-supabase-backups"
+}

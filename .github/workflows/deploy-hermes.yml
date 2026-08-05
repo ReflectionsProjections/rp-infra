@@ -2,6 +2,9 @@ name: Deploy Hermes
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types:
+      - hermes-main-push
   push:
     branches:
       - main
@@ -18,15 +21,20 @@ permissions:
 
 jobs:
   deploy:
+    if: github.event_name != 'repository_dispatch' || github.event.client_payload.ref == 'refs/heads/main'
     name: Build Hermes and trigger CodeDeploy
     runs-on: ubuntu-latest
+    env:
+      SOURCE_REPOSITORY: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.repository || vars.HERMES_REPOSITORY }}
+      SOURCE_REF: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.ref || vars.HERMES_REF }}
+      SOURCE_SHA: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.sha }}
 
     steps:
       - name: Check out Hermes source
         uses: actions/checkout@v4
         with:
-          repository: ${{ vars.HERMES_REPOSITORY }}
-          ref: ${{ vars.HERMES_REF }}
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          ref: ${{ env.SOURCE_REF }}
           path: hermes
 
       - name: Set up Node.js
@@ -58,7 +66,7 @@ jobs:
       - name: Create deployment archive
         run: |
           cd bundle
-          zip -r "../hermes-${GITHUB_SHA}.zip" .
+          zip -r "../hermes-${SOURCE_SHA}.zip" .
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -68,7 +76,7 @@ jobs:
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload artifact bundle to S3
-        run: aws s3 cp "hermes-${GITHUB_SHA}.zip" "s3://${{ vars.HERMES_CODEDEPLOY_BUCKET }}/hermes/hermes-${GITHUB_SHA}.zip"
+        run: aws s3 cp "hermes-${SOURCE_SHA}.zip" "s3://${{ vars.HERMES_CODEDEPLOY_BUCKET }}/hermes/hermes-${SOURCE_SHA}.zip"
 
       - name: Start CodeDeploy deployment
         id: deploy
@@ -76,8 +84,8 @@ jobs:
           DEPLOYMENT_ID="$(aws deploy create-deployment \
             --application-name "${{ vars.HERMES_CODEDEPLOY_APP_NAME }}" \
             --deployment-group-name "${{ vars.HERMES_CODEDEPLOY_DEPLOYMENT_GROUP }}" \
-            --s3-location bucket="${{ vars.HERMES_CODEDEPLOY_BUCKET }}",key="hermes/hermes-${GITHUB_SHA}.zip",bundleType=zip \
-            --description "rp-infra deploy of Hermes for ${GITHUB_SHA}" \
+            --s3-location bucket="${{ vars.HERMES_CODEDEPLOY_BUCKET }}",key="hermes/hermes-${SOURCE_SHA}.zip",bundleType=zip \
+            --description "rp-infra deploy of Hermes for ${SOURCE_SHA}" \
             --query "deploymentId" \
             --output text)"
           echo "deployment_id=${DEPLOYMENT_ID}" >> "${GITHUB_OUTPUT}"

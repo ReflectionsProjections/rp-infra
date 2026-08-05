@@ -2,6 +2,9 @@
 locals {
   cert_path = var.tls_certificate_path != "" ? var.tls_certificate_path : "/etc/nginx/ssl/${var.service_name}/origin.crt"
   key_path  = var.tls_private_key_path != "" ? var.tls_private_key_path : "/etc/nginx/ssl/${var.service_name}/origin.key"
+  supabase_backup_script = var.install_supabase_backup_script ? templatefile("${path.module}/templates/supabase_backups.sh.tftpl", {
+    supabase_backup_env_path = var.supabase_backup_env_path
+  }) : ""
 
   service_tags = merge(var.extra_tags, {
     Name        = var.service_name
@@ -130,6 +133,77 @@ resource "aws_iam_role_policy_attachment" "cloudwatch" {
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
 
+resource "aws_iam_role_policy" "secrets_read" {
+  count = length(var.secretsmanager_secret_arns) > 0 ? 1 : 0
+
+  name = "${var.service_name}-secrets-read"
+  role = aws_iam_role.instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["secretsmanager:GetSecretValue"]
+        Resource = var.secretsmanager_secret_arns
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "supabase_backup_s3" {
+  count = var.supabase_backup_bucket != "" ? 1 : 0
+
+  name = "${var.service_name}-supabase-backup-s3"
+  role = aws_iam_role.instance.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = ["s3:PutObject"]
+        Resource = "arn:aws:s3:::${var.supabase_backup_bucket}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_s3_bucket" "codedeploy_artifacts" {
+  count = var.create_codedeploy_artifact_bucket ? 1 : 0
+
+  bucket = var.codedeploy_artifact_bucket_name
+  tags   = local.service_tags
+}
+
+resource "aws_s3_bucket_public_access_block" "codedeploy_artifacts" {
+  count = var.create_codedeploy_artifact_bucket ? 1 : 0
+
+  bucket = aws_s3_bucket.codedeploy_artifacts[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "codedeploy_artifacts" {
+  count = var.create_codedeploy_artifact_bucket ? 1 : 0
+
+  bucket = aws_s3_bucket.codedeploy_artifacts[0].id
+
+  rule {
+    id     = "expire-old-bundles"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 60
+    }
+  }
+}
+
 resource "aws_instance" "this" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
@@ -140,18 +214,31 @@ resource "aws_instance" "this" {
   associate_public_ip_address = true
 
   user_data = templatefile("${path.module}/templates/user_data.sh.tftpl", {
-    aws_region            = var.aws_region
-    deployment_path       = var.deployment_path
-    domain_name           = var.domain_name
-    letsencrypt_email     = var.letsencrypt_email
-    use_letsencrypt       = var.use_letsencrypt
-    nginx_conf_base64     = base64encode(local.nginx_conf)
-    service_name          = var.service_name
-    tls_certificate_path  = local.cert_path
-    tls_private_key_path  = local.key_path
+    aws_region                     = var.aws_region
+    deployment_path                = var.deployment_path
+    domain_name                    = var.domain_name
+    install_cloudwatch_agent       = var.install_cloudwatch_agent
+    install_supabase_backup_script = var.install_supabase_backup_script
+    letsencrypt_email              = var.letsencrypt_email
+    nginx_conf_base64              = base64encode(local.nginx_conf)
+    service_name                   = var.service_name
+    supabase_backup_env_path       = var.supabase_backup_env_path
+    supabase_backup_script_base64  = base64encode(local.supabase_backup_script)
+    tls_certificate_path           = local.cert_path
+    tls_private_key_path           = local.key_path
+    use_letsencrypt                = var.use_letsencrypt
   })
 
   tags = local.service_tags
+
+  // These hosts are stateful pets: Hermes keeps a manual .env on disk and
+  // both keep TLS certs. A newer "most recent" AMI or an edited bootstrap
+  // script must not replace or restart a running instance. Both only take
+  // effect at first boot anyway. To rebuild a host on purpose, taint it:
+  //   terraform taint module.<service>.aws_instance.this
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
 }
 
 resource "aws_eip" "this" {

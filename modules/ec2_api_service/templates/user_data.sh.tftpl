@@ -4,11 +4,21 @@ set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y ca-certificates curl gnupg nginx openssl ruby-full wget
+apt-get install -y awscli ca-certificates curl gnupg nginx openssl ruby-full wget
 
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 apt-get install -y nodejs
 npm install -g yarn pm2
+
+if [ "${install_cloudwatch_agent}" = "true" ]; then
+    wget -q https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
+    dpkg -i /tmp/amazon-cloudwatch-agent.deb || apt-get install -f -y
+    rm -f /tmp/amazon-cloudwatch-agent.deb
+fi
+
+if [ "${install_supabase_backup_script}" = "true" ]; then
+    apt-get install -y postgresql-client
+fi
 
 if [ "${use_letsencrypt}" = "true" ]; then
     apt-get install -y certbot python3-certbot-nginx
@@ -17,8 +27,10 @@ fi
 systemctl enable nginx
 systemctl start nginx
 
-env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu || true
-systemctl enable pm2-ubuntu || true
+# Deploy scripts manage the app with "sudo pm2", so the resurrect unit must
+# belong to root, not ubuntu.
+env PATH=$PATH:/usr/bin pm2 startup systemd -u root --hp /root || true
+systemctl enable pm2-root || true
 
 mkdir -p ${deployment_path}
 chown -R ubuntu:ubuntu ${deployment_path}
@@ -32,6 +44,13 @@ fi
 
 systemctl enable codedeploy-agent
 systemctl restart codedeploy-agent
+
+if [ "${install_supabase_backup_script}" = "true" ]; then
+    install -d -m 0755 /usr/local/bin
+    install -d -m 0755 "$(dirname "${supabase_backup_env_path}")"
+    echo "${supabase_backup_script_base64}" | base64 --decode > /usr/local/bin/supabase_backups.sh
+    chmod 0755 /usr/local/bin/supabase_backups.sh
+fi
 
 mkdir -p "$(dirname "${tls_certificate_path}")"
 mkdir -p "$(dirname "${tls_private_key_path}")"
@@ -57,12 +76,12 @@ set -euo pipefail
 
 LE_LIVE_DIR="/etc/letsencrypt/live/${domain_name}"
 
-if [ ! -f "\${LE_LIVE_DIR}/fullchain.pem" ] || [ ! -f "\${LE_LIVE_DIR}/privkey.pem" ]; then
+if [ ! -f "\$${LE_LIVE_DIR}/fullchain.pem" ] || [ ! -f "\$${LE_LIVE_DIR}/privkey.pem" ]; then
     exit 0
 fi
 
-install -D -m 0644 "\${LE_LIVE_DIR}/fullchain.pem" "${tls_certificate_path}"
-install -D -m 0600 "\${LE_LIVE_DIR}/privkey.pem" "${tls_private_key_path}"
+install -D -m 0644 "\$${LE_LIVE_DIR}/fullchain.pem" "${tls_certificate_path}"
+install -D -m 0600 "\$${LE_LIVE_DIR}/privkey.pem" "${tls_private_key_path}"
 
 nginx -t
 systemctl reload nginx
