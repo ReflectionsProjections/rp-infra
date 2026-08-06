@@ -1,0 +1,84 @@
+name: Deploy RP API
+
+# Deploys are manual for now: run this workflow from the Actions tab.
+# The repository_dispatch trigger is inert until rp-monorepo sends the
+# rp-api-main-push event.
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - rp-api-main-push
+
+concurrency:
+  group: deploy-rp-api
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name != 'repository_dispatch' || github.event.client_payload.ref == 'refs/heads/main'
+    name: Package RP API and trigger CodeDeploy
+    runs-on: ubuntu-latest
+    env:
+      SOURCE_REPOSITORY: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.repository || vars.RP_API_REPOSITORY }}
+      SOURCE_REF: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.ref || vars.RP_API_REF }}
+      SOURCE_SHA: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.sha || github.sha }}
+
+    steps:
+      - name: Check out RP monorepo source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.SOURCE_REPOSITORY }}
+          ref: ${{ env.SOURCE_REF }}
+          token: ${{ secrets.RP_API_REPOSITORY_TOKEN }}
+          path: rp-monorepo
+
+      - name: Prepare CodeDeploy bundle
+        run: |
+          mkdir -p bundle
+          cp -R rp-monorepo/services/api/. bundle/
+          find bundle/scripts -name '*.sh' -exec chmod +x {} +
+
+      - name: Verify bundle layout
+        run: |
+          test -f bundle/appspec.yml
+          test -f bundle/package.json
+          test -f bundle/.yarnrc.yml
+          test -f bundle/.yarn/releases/yarn-4.9.1.cjs
+          test -f bundle/ecosystem.config.cjs
+          test -f bundle/scripts/validate_service.sh
+          test -d bundle/.yarn
+          test -d bundle/src
+          test -d bundle/scripts
+
+      - name: Create deployment archive
+        run: |
+          cd bundle
+          zip -r "../rp-api-${SOURCE_SHA}.zip" .
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload artifact bundle to S3
+        run: aws s3 cp "rp-api-${SOURCE_SHA}.zip" "s3://${{ vars.RP_API_CODEDEPLOY_BUCKET }}/rp-api/rp-api-${SOURCE_SHA}.zip"
+
+      - name: Start CodeDeploy deployment
+        id: deploy
+        run: |
+          DEPLOYMENT_ID="$(aws deploy create-deployment \
+            --application-name "${{ vars.RP_API_CODEDEPLOY_APP_NAME }}" \
+            --deployment-group-name "${{ vars.RP_API_CODEDEPLOY_DEPLOYMENT_GROUP }}" \
+            --s3-location bucket="${{ vars.RP_API_CODEDEPLOY_BUCKET }}",key="rp-api/rp-api-${SOURCE_SHA}.zip",bundleType=zip \
+            --description "rp-infra deploy of RP API for ${SOURCE_SHA}" \
+            --query "deploymentId" \
+            --output text)"
+          echo "deployment_id=${DEPLOYMENT_ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Wait for deployment to succeed
+        run: aws deploy wait deployment-successful --deployment-id "${{ steps.deploy.outputs.deployment_id }}"

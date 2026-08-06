@@ -82,6 +82,48 @@ variable "letsencrypt_email" {
   default     = ""
 }
 
+variable "install_supabase_backup_script" {
+  description = "Whether to install the manual Supabase backup helper script on the instance."
+  type        = bool
+  default     = false
+}
+
+variable "supabase_backup_env_path" {
+  description = "Path to the manual env file consumed by the Supabase backup helper script."
+  type        = string
+  default     = "/etc/rp-api/supabase-backup.env"
+}
+
+variable "secretsmanager_secret_arns" {
+  description = "Secrets Manager secret ARNs the instance role may read. Deploy hook scripts fetch these to build the app .env file."
+  type        = list(string)
+  default     = []
+}
+
+variable "install_cloudwatch_agent" {
+  description = "Whether to install the CloudWatch agent on the instance. Required when deploy scripts load a CloudWatch agent config."
+  type        = bool
+  default     = false
+}
+
+variable "create_codedeploy_artifact_bucket" {
+  description = "Whether to create the S3 bucket that CI uploads CodeDeploy revision bundles to."
+  type        = bool
+  default     = false
+}
+
+variable "codedeploy_artifact_bucket_name" {
+  description = "Name of the CodeDeploy artifact bucket to create. Required when create_codedeploy_artifact_bucket is true."
+  type        = string
+  default     = ""
+}
+
+variable "supabase_backup_bucket" {
+  description = "Optional S3 bucket name the Supabase backup script uploads to. Grants the instance role s3:PutObject on it."
+  type        = string
+  default     = ""
+}
+
 variable "extra_tags" {
   description = "Additional tags applied to resources for this service."
   type        = map(string)
