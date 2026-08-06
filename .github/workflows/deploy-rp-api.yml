@@ -1,16 +1,13 @@
 name: Deploy RP API
 
+# Deploys are manual for now: run this workflow from the Actions tab.
+# The repository_dispatch trigger is inert until rp-monorepo sends the
+# rp-api-main-push event.
 on:
   workflow_dispatch:
   repository_dispatch:
     types:
       - rp-api-main-push
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/deploy-rp-api.yml"
-      - "README.md"
 
 concurrency:
   group: deploy-rp-api

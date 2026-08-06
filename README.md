@@ -54,10 +54,9 @@ terraform apply
 
 - Cloudflare DNS is not yet managed in this scaffold. Terraform outputs the Elastic IPs you can point A records at.
 - Nginx is configured to use stable per-service cert paths. The bootstrap script creates a temporary self-signed cert so Nginx can start cleanly before Certbot issues a real certificate.
-- Hermes now ships its own `appspec.yml` and CodeDeploy scripts, matching the `rp-api` deployment model.
 - The RP API staging host installs the manual Supabase backup helper script, but scheduling remains entirely manual on the instance.
-- Hermes deployment automation should live here, not in the Hermes repo itself. This repo can safely hold AWS-specific GitHub Actions secrets/vars because it is the infrastructure owner.
-- Hermes is configured to install Certbot on the host. If `hermes_letsencrypt_email` is set, first boot will try to obtain a Let's Encrypt certificate and future renewals will be synced back into the Nginx cert paths automatically.
+- Deployment automation lives here, not in the app repos themselves. This repo can safely hold AWS-specific GitHub Actions secrets/vars because it is the infrastructure owner.
+- Hermes is retired: its deploy workflow has been removed, though its instance is still Terraform-managed. See the "Hermes (retired)" section below.
 
 ## Manual Supabase Backups
 
@@ -117,37 +116,9 @@ sudo /usr/local/bin/hermes-api-issue-letsencrypt-cert.sh
 
 After the origin has a real certificate, Cloudflare should be set to `Proxied` with SSL/TLS mode `Full (strict)`.
 
-## Hermes CI/CD
+## Hermes (retired)
 
-The intended Hermes deploy flow is:
-
-1. Terraform provisions the EC2 instance, Nginx, PM2, and CodeDeploy resources
-2. A GitHub Actions workflow in `rp-infra` checks out the public Hermes repo
-3. The workflow builds `dist/`
-4. The workflow creates a CodeDeploy bundle and uploads it to `s3://rp-hermes-codedeploy-artifacts`
-5. The workflow starts a CodeDeploy deployment against the Hermes application and deployment group
-
-The workflow needs the following repository configuration in `rp-infra`:
-
-- Secrets:
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
-- Variables:
-  - `AWS_REGION`
-  - `HERMES_CODEDEPLOY_BUCKET`
-  - `HERMES_CODEDEPLOY_APP_NAME`
-  - `HERMES_CODEDEPLOY_DEPLOYMENT_GROUP`
-  - `HERMES_REPOSITORY`
-  - `HERMES_REF`
-
-Suggested values:
-
-- `AWS_REGION=us-east-2`
-- `HERMES_CODEDEPLOY_BUCKET=rp-hermes-codedeploy-artifacts`
-- `HERMES_CODEDEPLOY_APP_NAME=hermes-api-codedeploy-app`
-- `HERMES_CODEDEPLOY_DEPLOYMENT_GROUP=hermes-api-deployment-group`
-- `HERMES_REPOSITORY=HackIllinois/Hermes`
-- `HERMES_REF=main`
+Hermes is no longer deployed. The `deploy-hermes.yml` workflow has been removed so nothing can trigger a Hermes deploy. The Terraform module for the Hermes instance is still in `environments/prod` and the instance is still running; remove the `hermes_api` module (and the Hermes statements in the deployer IAM policy) and apply when you are ready to decommission it.
 
 ## RP API Staging CI/CD
 
