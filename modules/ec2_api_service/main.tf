@@ -267,13 +267,18 @@ resource "aws_codedeploy_deployment_group" "this" {
     events  = ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM", "DEPLOYMENT_STOP_ON_REQUEST"]
   }
 
+  // CodeDeploy ORs the filters inside one ec2_tag_set and ANDs separate sets.
+  // Keep each filter in its own set so an instance must match Service AND
+  // Environment, not either one.
   ec2_tag_set {
     ec2_tag_filter {
       key   = "Service"
       type  = "KEY_AND_VALUE"
       value = var.service_name
     }
+  }
 
+  ec2_tag_set {
     ec2_tag_filter {
       key   = "Environment"
       type  = "KEY_AND_VALUE"
