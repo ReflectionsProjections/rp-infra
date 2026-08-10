@@ -4,7 +4,14 @@ set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y awscli ca-certificates curl gnupg nginx openssl ruby-full wget
+apt-get install -y ca-certificates curl gnupg nginx openssl ruby-full unzip wget
+
+# Ubuntu 24.04 does not ship an awscli apt package. Install AWS CLI v2 from
+# the official bundle so /usr/local/bin/aws exists for deploy hook scripts.
+curl -sSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install
+rm -rf /tmp/awscliv2.zip /tmp/aws
 
 curl -fsSL https://deb.nodesource.com/setup_24.x | bash -
 apt-get install -y nodejs
