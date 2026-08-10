@@ -8,7 +8,7 @@ This scaffold is set up for:
 
 - one EC2 instance per API
 - a `t2.small` instance for Hermes
-- a `t2.micro` staging instance for the Terraform-managed RP API host
+- a `t2.micro` instance for the Terraform-managed RP API host
 - default VPC usage to keep costs and complexity down
 - host-level Nginx terminating TLS and proxying to the app container
 - CodeDeploy-managed app deployments onto EC2
@@ -17,7 +17,7 @@ This scaffold is set up for:
 The production entrypoint now wires up:
 
 - Hermes on its current host
-- an `rp-api` staging host at `api-staging.reflectionsprojections.org`
+- an `rp-api` host, reachable at the temporary domain `api-staging.reflectionsprojections.org` until cutover
 
 The existing production `api.reflectionsprojections.org` box is still manually provisioned and remains outside Terraform until cutover.
 
@@ -54,7 +54,7 @@ terraform apply
 
 - Cloudflare DNS is not yet managed in this scaffold. Terraform outputs the Elastic IPs you can point A records at.
 - Nginx is configured to use stable per-service cert paths. The bootstrap script creates a temporary self-signed cert so Nginx can start cleanly before Certbot issues a real certificate.
-- The RP API staging host installs the manual Supabase backup helper script, but scheduling remains entirely manual on the instance.
+- The RP API host installs the manual Supabase backup helper script, but scheduling remains entirely manual on the instance.
 - Deployment automation lives here, not in the app repos themselves. This repo can safely hold AWS-specific GitHub Actions secrets/vars because it is the infrastructure owner.
 - Hermes is retired: its deploy workflow has been removed, though its instance is still Terraform-managed. See the "Hermes (retired)" section below.
 
@@ -120,15 +120,15 @@ After the origin has a real certificate, Cloudflare should be set to `Proxied` w
 
 Hermes is no longer deployed. The `deploy-hermes.yml` workflow has been removed so nothing can trigger a Hermes deploy. The Terraform module for the Hermes instance is still in `environments/prod` and the instance is still running; remove the `hermes_api` module (and the Hermes statements in the deployer IAM policy) and apply when you are ready to decommission it.
 
-## RP API Staging CI/CD
+## RP API CI/CD
 
-The intended RP API staging deploy flow is:
+The intended RP API deploy flow is:
 
 1. Terraform provisions the EC2 instance, Nginx, PM2, CodeDeploy resources, and the manual backup helper script
 2. A GitHub Actions workflow in `rp-infra` checks out the `rp-monorepo` repository
 3. The workflow packages the contents of `services/api` as the CodeDeploy bundle root
 4. The workflow uploads the zip to the RP API artifact bucket
-5. The workflow starts a CodeDeploy deployment against the RP API staging application and deployment group
+5. The workflow starts a CodeDeploy deployment against the RP API application and deployment group
 
 The workflow needs the following repository configuration in `rp-infra`:
 
@@ -148,8 +148,8 @@ Suggested values:
 
 - `AWS_REGION=us-east-2`
 - `RP_API_CODEDEPLOY_BUCKET=rp-api-codedeploy-artifacts`
-- `RP_API_CODEDEPLOY_APP_NAME=rp-api-staging-codedeploy-app`
-- `RP_API_CODEDEPLOY_DEPLOYMENT_GROUP=rp-api-staging-deployment-group`
+- `RP_API_CODEDEPLOY_APP_NAME=rp-api-codedeploy-app`
+- `RP_API_CODEDEPLOY_DEPLOYMENT_GROUP=rp-api-deployment-group`
 - `RP_API_REPOSITORY=ReflectionsProjections/rp-monorepo`
 - `RP_API_REF=main`
 

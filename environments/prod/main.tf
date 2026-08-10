@@ -89,7 +89,7 @@ module "rp_api" {
 
   aws_region                        = var.aws_region
   environment                       = var.environment
-  service_name                      = "rp-api-staging"
+  service_name                      = "rp-api"
   domain_name                       = var.rp_api_domain_name
   app_port                          = 3000
   deployment_path                   = "/home/ubuntu/rp-api"
@@ -110,9 +110,7 @@ module "rp_api" {
     aws_secretsmanager_secret.rp_api_env.arn,
     aws_secretsmanager_secret.rp_api_firebase_admin_cert.arn,
   ]
-  extra_tags = merge(local.common_tags, {
-    Stage = "staging"
-  })
+  extra_tags = local.common_tags
 }
 
 // IAM user for the GitHub Actions deploy workflows. Both deploy workflows in

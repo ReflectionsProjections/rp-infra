@@ -47,7 +47,7 @@ variable "hermes_letsencrypt_email" {
 }
 
 variable "rp_api_domain_name" {
-  description = "Public domain name for the RP API staging host."
+  description = "Public domain name for the RP API host."
   type        = string
 }
 
@@ -58,7 +58,7 @@ variable "rp_api_codedeploy_artifact_bucket" {
 }
 
 variable "rp_api_letsencrypt_email" {
-  description = "Email address used to register and renew the RP API staging Let's Encrypt certificate."
+  description = "Email address used to register and renew the RP API Let's Encrypt certificate."
   type        = string
   default     = ""
 }

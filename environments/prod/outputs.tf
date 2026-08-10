@@ -20,17 +20,17 @@ output "hermes_codedeploy_artifact_bucket" {
 }
 
 output "rp_api_public_ip" {
-  description = "Elastic IP attached to the RP API staging instance."
+  description = "Elastic IP attached to the RP API instance."
   value       = module.rp_api.public_ip
 }
 
 output "rp_api_codedeploy_app_name" {
-  description = "CodeDeploy application name for the RP API staging host."
+  description = "CodeDeploy application name for the RP API host."
   value       = module.rp_api.codedeploy_app_name
 }
 
 output "rp_api_codedeploy_deployment_group" {
-  description = "CodeDeploy deployment group for the RP API staging host."
+  description = "CodeDeploy deployment group for the RP API host."
   value       = module.rp_api.codedeploy_deployment_group_name
 }
 
