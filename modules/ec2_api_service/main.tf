@@ -213,6 +213,10 @@ resource "aws_instance" "this" {
   key_name                    = var.key_name
   associate_public_ip_address = true
 
+  root_block_device {
+    volume_size = var.root_volume_size_gb
+  }
+
   user_data = templatefile("${path.module}/templates/user_data.sh.tftpl", {
     aws_region                     = var.aws_region
     deployment_path                = var.deployment_path

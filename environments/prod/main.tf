@@ -95,6 +95,7 @@ module "rp_api" {
   deployment_path                   = "/home/ubuntu/rp-api"
   healthcheck_path                  = "/status"
   instance_type                     = "t2.micro"
+  root_volume_size_gb               = 16
   key_name                          = var.key_name
   ssh_cidr_blocks                   = var.ssh_cidr_blocks
   use_letsencrypt                   = true

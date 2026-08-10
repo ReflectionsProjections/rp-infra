@@ -41,6 +41,12 @@ variable "instance_type" {
   default     = "t2.small"
 }
 
+variable "root_volume_size_gb" {
+  description = "Root EBS volume size in GB. The default matches the Ubuntu AMI's stock 8 GB so existing instances see no diff; raise it for hosts that build on-box."
+  type        = number
+  default     = 8
+}
+
 variable "key_name" {
   description = "Optional EC2 key pair name."
   type        = string

@@ -3,6 +3,16 @@ set -euxo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
 
+# t2.micro-class hosts have ~1GB RAM; yarn installs and tsc builds get
+# OOM-killed without swap.
+if [ ! -f /swapfile ]; then
+    fallocate -l 2G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo "/swapfile none swap sw 0 0" >> /etc/fstab
+fi
+
 apt-get update
 apt-get install -y ca-certificates curl gnupg nginx openssl ruby-full unzip wget
 
