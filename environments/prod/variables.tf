@@ -63,6 +63,12 @@ variable "rp_api_letsencrypt_email" {
   default     = ""
 }
 
+variable "rp_api_resume_bucket" {
+  description = "S3 bucket for this event year's resume uploads. The API reads it from S3_BUCKET_NAME in the env secret, not from terraform."
+  type        = string
+  default     = "rp-2026-resumes"
+}
+
 variable "rp_api_supabase_backup_bucket" {
   description = "S3 bucket created for the Supabase backup script uploads. The instance role gets s3:PutObject on it."
   type        = string

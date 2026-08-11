@@ -39,6 +39,11 @@ output "rp_api_codedeploy_artifact_bucket" {
   value       = var.rp_api_codedeploy_artifact_bucket
 }
 
+output "rp_api_resume_bucket" {
+  description = "S3 bucket for this event year's resume uploads. Must match S3_BUCKET_NAME in the rp-api/prod/env secret."
+  value       = aws_s3_bucket.rp_api_resumes.bucket
+}
+
 output "rp_api_supabase_backup_bucket" {
   description = "S3 bucket the Supabase backup script uploads to."
   value       = aws_s3_bucket.rp_api_supabase_backups.bucket

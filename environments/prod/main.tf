@@ -84,6 +84,36 @@ resource "aws_s3_bucket_lifecycle_configuration" "rp_api_supabase_backups" {
   }
 }
 
+// Resume uploads bucket for the current event year. Past years' buckets
+// (rp-2023-resumes .. rp-2025-resumes) were created by hand and stay outside
+// terraform. The API reaches the bucket with the rp-api IAM user's keys, so
+// switching years means: create the new bucket here, update S3_BUCKET_NAME in
+// the rp-api/prod/env secret, redeploy. CORS mirrors the 2025 bucket because
+// the frontend uploads resumes straight to S3 with presigned POSTs.
+resource "aws_s3_bucket" "rp_api_resumes" {
+  bucket = var.rp_api_resume_bucket
+  tags   = local.common_tags
+}
+
+resource "aws_s3_bucket_public_access_block" "rp_api_resumes" {
+  bucket = aws_s3_bucket.rp_api_resumes.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_cors_configuration" "rp_api_resumes" {
+  bucket = aws_s3_bucket.rp_api_resumes.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT", "POST", "GET"]
+    allowed_origins = ["*"]
+  }
+}
+
 module "rp_api" {
   source = "../../modules/ec2_api_service"
 
