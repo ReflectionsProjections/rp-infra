@@ -16,10 +16,10 @@ This scaffold is set up for:
 
 The production entrypoint now wires up:
 
-- Hermes on its current host
-- an `rp-api` host, reachable at the temporary domain `api-staging.reflectionsprojections.org` until cutover
+- Hermes on its current host (retired, see below)
+- the `rp-api` host serving `api.reflectionsprojections.org`
 
-The existing production `api.reflectionsprojections.org` box is still manually provisioned and remains outside Terraform until cutover.
+The previous hand-provisioned `api.reflectionsprojections.org` box is out of rotation since the cutover and can be decommissioned once nothing on it is still needed.
 
 ## Current Layout
 
@@ -32,11 +32,9 @@ The existing production `api.reflectionsprojections.org` box is still manually p
 This scaffold intentionally does not write application secrets into Terraform state.
 
 - Hermes keeps a manually managed host-side `.env` file at `/home/ubuntu/hermes/.env`.
-- rp-api reads its secrets from AWS Secrets Manager at deploy time. Terraform creates two empty secret shells (`rp-api/prod/env` and `rp-api/prod/firebase-admin-cert`) and grants the instance role `secretsmanager:GetSecretValue` on them. Load the values manually in the AWS console as plaintext: the full `.env` file content in the first, the Firebase service account JSON in the second. A CodeDeploy hook (`services/api/scripts/load_env.sh` in rp-monorepo) fetches both on every deployment and writes `/home/ubuntu/rp-api/.env` and `/home/ubuntu/rp-api/firebase-admin-cert.json`.
+- rp-api reads its secrets from AWS Secrets Manager at deploy time. Terraform creates three empty secret shells (`rp-api/prod/env`, `rp-api/prod/firebase-admin-cert`, and `rp-api/prod/supabase-backup-env`) and grants the instance role `secretsmanager:GetSecretValue` on them. Load the values manually in the AWS console as plaintext: the full `.env` file content in the first, the Firebase service account JSON in the second, and the backup script's Postgres connection lines in the third. A CodeDeploy hook (`services/api/scripts/load_env.sh` in rp-monorepo) fetches the first two on every deployment and writes `/home/ubuntu/rp-api/.env` and `/home/ubuntu/rp-api/firebase-admin-cert.json`; the backup script fetches the third at runtime and writes nothing to disk.
 
-Terraform never reads the secret values, so they stay out of the state file.
-
-The EC2 module can also install a manual Supabase backup helper script without managing any scheduler or secret material. When enabled, the script is written to `/usr/local/bin/supabase_backups.sh` and is expected to read its credentials and bucket settings from a host-created env file such as `/etc/rp-api/supabase-backup.env`.
+Terraform never reads the secret values, so they stay out of the state file. No secret file on any rp-api host is created by hand.
 
 ## Terraform Usage
 
@@ -54,46 +52,42 @@ terraform apply
 
 - Cloudflare DNS is not yet managed in this scaffold. Terraform outputs the Elastic IPs you can point A records at.
 - Nginx is configured to use stable per-service cert paths. The bootstrap script creates a temporary self-signed cert so Nginx can start cleanly before Certbot issues a real certificate.
-- The RP API host installs the manual Supabase backup helper script, but scheduling remains entirely manual on the instance.
+- The RP API host gets postgresql-client for the Supabase backup script, which ships in the CodeDeploy bundle; scheduling remains entirely manual on the instance.
 - Deployment automation lives here, not in the app repos themselves. This repo can safely hold AWS-specific GitHub Actions secrets/vars because it is the infrastructure owner.
 - Hermes is retired: its deploy workflow has been removed, though its instance is still Terraform-managed. See the "Hermes (retired)" section below.
 
 ## Manual Supabase Backups
 
-The shared EC2 module can optionally install a backup helper script for services that need to export a Supabase Postgres database to S3. Terraform only installs the script and its package dependencies. It does not create an env file, cron job, or timer.
+The backup script itself lives in rp-monorepo (`services/api/scripts/supabase_backups.sh`) and arrives on the host with every CodeDeploy bundle, so it never goes stale. It exports every public table to CSV and uploads to the `rp-api-supabase-backups` bucket. Terraform's part is:
 
-To enable it for a service module:
+- `install_supabase_backup_tools = true` on the service module installs `postgresql-client` at first boot
+- `supabase_backup_bucket` grants the instance role `s3:PutObject` on the backup bucket
+- the `rp-api/prod/supabase-backup-env` secret shell holds the Postgres connection values the script fetches at runtime (nothing credential-bearing is created on the host)
 
-```hcl
-install_supabase_backup_script = true
-supabase_backup_env_path       = "/etc/rp-api/supabase-backup.env"
-```
-
-After the instance is provisioned, create the env file manually on the host with values like:
+Load these plaintext lines into the secret (values from the Supabase dashboard's session pooler; the DB password is the database password, not the service key):
 
 ```bash
 DB_HOST=...
-DB_PORT=6543
+DB_PORT=...
 DB_USER=...
 DB_NAME=postgres
 DB_PASSWORD=...
-S3_BUCKET=rp-api-supabase-backups
-S3_PREFIX=supabase
 ```
 
-Then lock it down:
+Optional lines: `S3_BUCKET` (default `rp-api-supabase-backups`) and `S3_PREFIX` (default `supabase`).
+
+Test it on the host with:
 
 ```bash
-sudo chmod 600 /etc/rp-api/supabase-backup.env
+sudo /home/ubuntu/rp-api/scripts/supabase_backups.sh
 ```
 
-You can test the helper manually with:
+Nothing schedules it by default. For recurring backups, add a cron entry on the box (note the `PATH` line — cron does not include `/usr/local/bin`, where the AWS CLI lives):
 
-```bash
-sudo /usr/local/bin/supabase_backups.sh
 ```
-
-If you later want recurring backups, add and remove cron entries manually on the box as needed.
+PATH=/usr/local/bin:/usr/bin:/bin
+0 9 * * * root /home/ubuntu/rp-api/scripts/supabase_backups.sh >> /var/log/supabase-backup.log 2>&1
+```
 
 ## Hermes TLS
 
@@ -124,7 +118,7 @@ Hermes is no longer deployed. The `deploy-hermes.yml` workflow has been removed 
 
 The intended RP API deploy flow is:
 
-1. Terraform provisions the EC2 instance, Nginx, PM2, CodeDeploy resources, and the manual backup helper script
+1. Terraform provisions the EC2 instance, Nginx, PM2, and the CodeDeploy resources
 2. A GitHub Actions workflow in `rp-infra` checks out the `rp-monorepo` repository
 3. The workflow packages the contents of `services/api` as the CodeDeploy bundle root
 4. The workflow uploads the zip to the RP API artifact bucket

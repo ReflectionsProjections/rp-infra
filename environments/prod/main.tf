@@ -53,6 +53,16 @@ resource "aws_secretsmanager_secret" "rp_api_firebase_admin_cert" {
   tags = local.common_tags
 }
 
+// Postgres connection values for the Supabase backup script
+// (services/api/scripts/supabase_backups.sh in rp-monorepo). Load plaintext
+// env lines: DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASSWORD. These are the
+// database's own credentials from the Supabase dashboard — they are not in
+// the app env secret, which only holds the Supabase URL and service key.
+resource "aws_secretsmanager_secret" "rp_api_supabase_backup_env" {
+  name = "rp-api/prod/supabase-backup-env"
+  tags = local.common_tags
+}
+
 // Private bucket for the manual Supabase backup script on the rp-api host.
 // The ec2_api_service module grants the instance role s3:PutObject on it.
 resource "aws_s3_bucket" "rp_api_supabase_backups" {
@@ -130,8 +140,7 @@ module "rp_api" {
   ssh_cidr_blocks                   = var.ssh_cidr_blocks
   use_letsencrypt                   = true
   letsencrypt_email                 = var.rp_api_letsencrypt_email
-  install_supabase_backup_script    = true
-  supabase_backup_env_path          = "/etc/rp-api/supabase-backup.env"
+  install_supabase_backup_tools     = true
   supabase_backup_bucket            = aws_s3_bucket.rp_api_supabase_backups.bucket
   install_cloudwatch_agent          = true
   create_codedeploy_artifact_bucket = true
@@ -140,6 +149,7 @@ module "rp_api" {
   secretsmanager_secret_arns = [
     aws_secretsmanager_secret.rp_api_env.arn,
     aws_secretsmanager_secret.rp_api_firebase_admin_cert.arn,
+    aws_secretsmanager_secret.rp_api_supabase_backup_env.arn,
   ]
   extra_tags = local.common_tags
 }

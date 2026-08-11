@@ -88,16 +88,10 @@ variable "letsencrypt_email" {
   default     = ""
 }
 
-variable "install_supabase_backup_script" {
-  description = "Whether to install the manual Supabase backup helper script on the instance."
+variable "install_supabase_backup_tools" {
+  description = "Whether to install postgresql-client for the Supabase backup script. The script itself ships in the CodeDeploy bundle (services/api/scripts/supabase_backups.sh in rp-monorepo) and reads its credentials from Secrets Manager."
   type        = bool
   default     = false
-}
-
-variable "supabase_backup_env_path" {
-  description = "Path to the manual env file consumed by the Supabase backup helper script."
-  type        = string
-  default     = "/etc/rp-api/supabase-backup.env"
 }
 
 variable "secretsmanager_secret_arns" {

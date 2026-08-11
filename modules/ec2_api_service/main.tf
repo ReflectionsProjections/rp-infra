@@ -2,10 +2,6 @@
 locals {
   cert_path = var.tls_certificate_path != "" ? var.tls_certificate_path : "/etc/nginx/ssl/${var.service_name}/origin.crt"
   key_path  = var.tls_private_key_path != "" ? var.tls_private_key_path : "/etc/nginx/ssl/${var.service_name}/origin.key"
-  supabase_backup_script = var.install_supabase_backup_script ? templatefile("${path.module}/templates/supabase_backups.sh.tftpl", {
-    supabase_backup_env_path = var.supabase_backup_env_path
-  }) : ""
-
   service_tags = merge(var.extra_tags, {
     Name        = var.service_name
     Service     = var.service_name
@@ -222,12 +218,10 @@ resource "aws_instance" "this" {
     deployment_path                = var.deployment_path
     domain_name                    = var.domain_name
     install_cloudwatch_agent       = var.install_cloudwatch_agent
-    install_supabase_backup_script = var.install_supabase_backup_script
+    install_supabase_backup_tools  = var.install_supabase_backup_tools
     letsencrypt_email              = var.letsencrypt_email
     nginx_conf_base64              = base64encode(local.nginx_conf)
     service_name                   = var.service_name
-    supabase_backup_env_path       = var.supabase_backup_env_path
-    supabase_backup_script_base64  = base64encode(local.supabase_backup_script)
     tls_certificate_path           = local.cert_path
     tls_private_key_path           = local.key_path
     use_letsencrypt                = var.use_letsencrypt

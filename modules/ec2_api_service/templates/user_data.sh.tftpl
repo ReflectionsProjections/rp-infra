@@ -33,7 +33,7 @@ if [ "${install_cloudwatch_agent}" = "true" ]; then
     rm -f /tmp/amazon-cloudwatch-agent.deb
 fi
 
-if [ "${install_supabase_backup_script}" = "true" ]; then
+if [ "${install_supabase_backup_tools}" = "true" ]; then
     apt-get install -y postgresql-client
 fi
 
@@ -61,13 +61,6 @@ fi
 
 systemctl enable codedeploy-agent
 systemctl restart codedeploy-agent
-
-if [ "${install_supabase_backup_script}" = "true" ]; then
-    install -d -m 0755 /usr/local/bin
-    install -d -m 0755 "$(dirname "${supabase_backup_env_path}")"
-    echo "${supabase_backup_script_base64}" | base64 --decode > /usr/local/bin/supabase_backups.sh
-    chmod 0755 /usr/local/bin/supabase_backups.sh
-fi
 
 mkdir -p "$(dirname "${tls_certificate_path}")"
 mkdir -p "$(dirname "${tls_private_key_path}")"

@@ -59,6 +59,11 @@ output "rp_api_firebase_admin_cert_secret_arn" {
   value       = aws_secretsmanager_secret.rp_api_firebase_admin_cert.arn
 }
 
+output "rp_api_supabase_backup_env_secret_arn" {
+  description = "Secrets Manager secret that must hold the Postgres connection values for the Supabase backup script."
+  value       = aws_secretsmanager_secret.rp_api_supabase_backup_env.arn
+}
+
 output "github_deployer_user_name" {
   description = "IAM user for the GitHub Actions deploy workflows. Create its access key manually."
   value       = aws_iam_user.github_deployer.name
