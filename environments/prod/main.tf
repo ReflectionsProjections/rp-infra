@@ -204,15 +204,6 @@ resource "aws_iam_role_policy" "github_deployer_role" {
   policy = data.aws_iam_policy_document.github_deployer.json
 }
 
-// Legacy IAM user for the deploy workflow, superseded by github_deployer_role
-// above. Kept until the OIDC path is verified end to end; then delete the
-// user's access key in the console, remove this user (and the repo's
-// AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets), and apply again.
-resource "aws_iam_user" "github_deployer" {
-  name = "rp-github-deployer"
-  tags = local.common_tags
-}
-
 data "aws_iam_policy_document" "github_deployer" {
   statement {
     sid = "UploadArtifacts"
@@ -248,10 +239,4 @@ data "aws_iam_policy_document" "github_deployer" {
     actions   = ["codedeploy:GetDeploymentConfig"]
     resources = ["arn:aws:codedeploy:${var.aws_region}:${data.aws_caller_identity.current.account_id}:deploymentconfig:*"]
   }
-}
-
-resource "aws_iam_user_policy" "github_deployer" {
-  name   = "rp-github-deployer"
-  user   = aws_iam_user.github_deployer.name
-  policy = data.aws_iam_policy_document.github_deployer.json
 }

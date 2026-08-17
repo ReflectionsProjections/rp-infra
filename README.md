@@ -124,14 +124,18 @@ The intended RP API deploy flow is:
 4. The workflow uploads the zip to the RP API artifact bucket
 5. The workflow starts a CodeDeploy deployment against the RP API application and deployment group
 
+The workflow authenticates to AWS with GitHub's OIDC provider: it assumes the
+`rp-github-deployer` IAM role (defined in `environments/prod`), so there are no
+long-lived AWS keys in repository secrets. The role's trust policy only accepts
+workflow runs from the `main` branch of this repository.
+
 The workflow needs the following repository configuration in `rp-infra`:
 
 - Secrets:
-  - `AWS_ACCESS_KEY_ID`
-  - `AWS_SECRET_ACCESS_KEY`
   - `RP_API_REPOSITORY_TOKEN`
 - Variables:
   - `AWS_REGION`
+  - `AWS_DEPLOY_ROLE_ARN`
   - `RP_API_CODEDEPLOY_BUCKET`
   - `RP_API_CODEDEPLOY_APP_NAME`
   - `RP_API_CODEDEPLOY_DEPLOYMENT_GROUP`
@@ -141,6 +145,7 @@ The workflow needs the following repository configuration in `rp-infra`:
 Suggested values:
 
 - `AWS_REGION=us-east-2`
+- `AWS_DEPLOY_ROLE_ARN` — the `github_deployer_role_arn` Terraform output
 - `RP_API_CODEDEPLOY_BUCKET=rp-api-codedeploy-artifacts`
 - `RP_API_CODEDEPLOY_APP_NAME=rp-api-codedeploy-app`
 - `RP_API_CODEDEPLOY_DEPLOYMENT_GROUP=rp-api-deployment-group`
