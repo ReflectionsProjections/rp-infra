@@ -154,12 +154,60 @@ module "rp_api" {
   extra_tags = local.common_tags
 }
 
-// IAM user for the GitHub Actions deploy workflows. Both deploy workflows in
-// this repo share the AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY repo secrets,
-// so this one user covers rp-api and Hermes. Terraform does not create the
-// access key; make one in the console and store it in repo secrets.
 data "aws_caller_identity" "current" {}
 
+// GitHub Actions authenticates to AWS with OIDC: the deploy workflow assumes
+// github_deployer_role via AssumeRoleWithWebIdentity, so no long-lived access
+// keys exist. The trust policy only accepts tokens minted for the main branch
+// of rp-infra.
+resource "aws_iam_openid_connect_provider" "github_actions" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  // AWS validates GitHub's OIDC issuer against its own trusted CAs and ignores
+  // this value, but the provider still requires the field to be set.
+  thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
+  tags            = local.common_tags
+}
+
+data "aws_iam_policy_document" "github_deployer_assume" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github_actions.arn]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["repo:ReflectionsProjections/rp-infra:ref:refs/heads/main"]
+    }
+  }
+}
+
+resource "aws_iam_role" "github_deployer_role" {
+  name               = "rp-github-deployer"
+  assume_role_policy = data.aws_iam_policy_document.github_deployer_assume.json
+  tags               = local.common_tags
+}
+
+resource "aws_iam_role_policy" "github_deployer_role" {
+  name   = "rp-github-deployer"
+  role   = aws_iam_role.github_deployer_role.id
+  policy = data.aws_iam_policy_document.github_deployer.json
+}
+
+// Legacy IAM user for the deploy workflow, superseded by github_deployer_role
+// above. Kept until the OIDC path is verified end to end; then delete the
+// user's access key in the console, remove this user (and the repo's
+// AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY secrets), and apply again.
 resource "aws_iam_user" "github_deployer" {
   name = "rp-github-deployer"
   tags = local.common_tags

@@ -13,8 +13,13 @@ concurrency:
   group: deploy-rp-api
   cancel-in-progress: true
 
+# id-token: write lets the job request a GitHub OIDC token, which
+# configure-aws-credentials exchanges for short-lived AWS credentials by
+# assuming the rp-github-deployer role. The role's trust policy only accepts
+# runs from the main branch of this repo.
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   deploy:
@@ -61,8 +66,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
 
       - name: Upload artifact bundle to S3

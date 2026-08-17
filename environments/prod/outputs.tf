@@ -65,6 +65,11 @@ output "rp_api_supabase_backup_env_secret_arn" {
 }
 
 output "github_deployer_user_name" {
-  description = "IAM user for the GitHub Actions deploy workflows. Create its access key manually."
+  description = "Legacy IAM user for the GitHub Actions deploy workflows. Superseded by github_deployer_role_arn."
   value       = aws_iam_user.github_deployer.name
+}
+
+output "github_deployer_role_arn" {
+  description = "IAM role the GitHub Actions deploy workflow assumes via OIDC. Store as the AWS_DEPLOY_ROLE_ARN repo variable."
+  value       = aws_iam_role.github_deployer_role.arn
 }
